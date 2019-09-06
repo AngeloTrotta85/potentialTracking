@@ -1,3 +1,0 @@
-package potentialtracking;
-
-@license(LGPL);
