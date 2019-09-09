@@ -42,6 +42,9 @@ simple CloudApp like IApp
     parameters:        
         double startTime @unit(s) = default(0s); // application start time 
         double stopTime @unit(s) = default(-1s);  // time of finishing sending, -1s means forever
+        
+        double forceUpdateTime @unit(s) = default(500ms); // force update interval 
+        
         @display("i=block/app");
         @lifecycleSupport;        
     gates:

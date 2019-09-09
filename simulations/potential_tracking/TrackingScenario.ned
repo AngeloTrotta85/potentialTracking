@@ -47,22 +47,22 @@ network TrackingScenario
         
         cloud: Cloud {
             parameters:
-                @display("p=300,50");
+                @display("p=100,350");
         }     
         
         uav[numUAVs]: UAVHost {
             parameters:
-                @display("p=300,150");
+                @display("p=300,50");
         }   
         
         mobcharger[numChargingCars]: MobileChargerHost {
             parameters:
-                @display("p=300,250");
+                @display("p=300,150");
         }   
         
         pedestrian[numPedestrians]: PedestrianHost {
             parameters:
-                @display("p=300,350");
+                @display("p=300,250");
         }
     
 }

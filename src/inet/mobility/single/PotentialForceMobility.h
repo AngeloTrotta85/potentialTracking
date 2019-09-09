@@ -34,6 +34,9 @@ class INET_API PotentialForceMobility : public MovingMobilityBase
 {
   protected:
     double speed;
+    Coord activeForce;
+    double mu;
+
 
   protected:
     virtual int numInitStages() const override { return NUM_INIT_STAGES; }
@@ -44,9 +47,16 @@ class INET_API PotentialForceMobility : public MovingMobilityBase
     /** @brief Move the host*/
     virtual void move() override;
 
+    /** @brief Update the actual velocity based on the force*/
+    virtual void updateVelocity();
+
   public:
     virtual double getMaxSpeed() const override { return speed; }
     PotentialForceMobility();
+
+    const Coord& getActiveForce() const { return activeForce; }
+    void setActiveForce(const Coord& activeForce) { this->activeForce = activeForce; }
+
 };
 
 } // namespace inet

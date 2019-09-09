@@ -38,6 +38,7 @@ class INET_API CloudApp : public ApplicationBase
     // parameters
     simtime_t startTime;
     simtime_t stopTime;
+    simtime_t forceUpdateTime;
 
     // state
     cMessage *selfMsg = nullptr;
@@ -53,6 +54,9 @@ class INET_API CloudApp : public ApplicationBase
 
     virtual void processStart();
     virtual void processStop();
+
+    virtual void updateUAVForces();
+    virtual void updateMobileChargerForces();
 
     virtual void handleStartOperation(LifecycleOperation *operation) override;
     virtual void handleStopOperation(LifecycleOperation *operation) override;

@@ -39,9 +39,12 @@ void CloudApp::initialize(int stage) {
         startTime = par("startTime");
         stopTime = par("stopTime");
 
+        forceUpdateTime = par("forceUpdateTime");
+
         if (stopTime >= SIMTIME_ZERO && stopTime < startTime)
             throw cRuntimeError("Invalid startTime/stopTime parameters");
         selfMsg = new cMessage("sendTimer");
+        selfMsg_run = new cMessage("forceTimer");
     }
 }
 
@@ -57,7 +60,7 @@ void CloudApp::processStart() {
         scheduleAt(stopTime, selfMsg);
     }
 
-
+    scheduleAt(simTime(), selfMsg_run);
 }
 
 
@@ -67,8 +70,8 @@ void CloudApp::processStop() {
 
 void CloudApp::handleMessageWhenUp(cMessage *msg) {
     if (msg->isSelfMessage()) {
-        ASSERT(msg == selfMsg);
-        switch (selfMsg->getKind()) {
+        if (msg == selfMsg) {
+            switch (selfMsg->getKind()) {
             case START:
                 processStart();
                 break;
@@ -79,6 +82,15 @@ void CloudApp::handleMessageWhenUp(cMessage *msg) {
 
             default:
                 throw cRuntimeError("Invalid kind %d in self message", (int)selfMsg->getKind());
+            }
+        }
+        else if (msg == selfMsg_run) {
+            updateUAVForces();
+            updateMobileChargerForces();
+            scheduleAt(simTime() + forceUpdateTime, selfMsg_run);
+        }
+        else {
+            throw cRuntimeError("Invalid self message", msg->getFullPath());
         }
     }
 }
@@ -112,6 +124,17 @@ void CloudApp::handleCrashOperation(LifecycleOperation *operation) {
     cancelEvent(selfMsg);
     cancelEvent(selfMsg_run);
 }
+
+
+void CloudApp::updateUAVForces() {
+    EV << "Updating UAV Forces!!!" << endl;
+}
+
+void CloudApp::updateMobileChargerForces() {
+    EV << "Updating Mobile Charger Forces!!!" << endl;
+}
+
+
 
 } // namespace inet
 
