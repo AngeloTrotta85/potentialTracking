@@ -43,7 +43,21 @@ simple CloudApp like IApp
         double startTime @unit(s) = default(0s); // application start time 
         double stopTime @unit(s) = default(-1s);  // time of finishing sending, -1s means forever
         
-        double forceUpdateTime @unit(s) = default(500ms); // force update interval 
+        double forceUpdateTime @unit(s) = default(0.5s); // force update interval 
+        
+        double wp = default(1);	// force pedestrian max val
+        double kp = default(0.001);	// force pedestrian coefficient
+        double wu = default(2);	// force UAVs max val
+        double ku = default(0.01);	// force UAVs coefficient
+        
+        double force_exponent = default(4);	// force exponent
+        
+        double deattraction_impact = default(1.0); // deattraction factor when a pedestrian is being covered
+        
+        double areaMinX @unit(m) = default(0 m); // min x position of the constraint area
+        double areaMinY @unit(m) = default(0 m); // min y position of the constraint area
+        double areaMaxX @unit(m) = default(0 m); // max x position of the constraint area
+        double areaMaxY @unit(m) = default(0 m); // max y position of the constraint area
         
         @display("i=block/app");
         @lifecycleSupport;        

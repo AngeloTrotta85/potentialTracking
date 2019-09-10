@@ -21,9 +21,12 @@
 
 #include <vector>
 
+#include "inet/common/geometry/common/Coord.h"
 #include "inet/common/INETDefs.h"
 
 #include "inet/applications/base/ApplicationBase.h"
+
+#include "../../mobility/single/PotentialForceMobility.h"
 
 namespace inet {
 
@@ -40,9 +43,29 @@ class INET_API CloudApp : public ApplicationBase
     simtime_t stopTime;
     simtime_t forceUpdateTime;
 
+    //unsigned int areaMinX;
+    //unsigned int areaMaxX;
+    //unsigned int areaMinY;
+    //unsigned int areaMaxY;
+
+    double wp;
+    double kp;
+    double wu;
+    double ku;
+
+    double force_exponent;
+    double deattraction_impact;
+
     // state
     cMessage *selfMsg = nullptr;
     cMessage *selfMsg_run = nullptr;
+
+    // internal variables
+    //std::vector< std::vector< double > > uavForcesMatrix;
+    //std::vector< std::vector< double > > carForcesMatrix;
+    std::vector< IMobility * > uavMobilityModules;
+    std::vector< IMobility * > carMobilityModules;
+    std::vector< IMobility * > pedonsMobilityModules;
 
 
   protected:
@@ -58,6 +81,10 @@ class INET_API CloudApp : public ApplicationBase
     virtual void updateUAVForces();
     virtual void updateMobileChargerForces();
 
+    virtual Coord calculateAttractiveForce(Coord me, Coord target, double maxVal, double coeff);
+    virtual Coord calculateRepulsiveForce(Coord me, Coord target, double maxVal, double coeff);
+    virtual double calculateAttractiveForceReduction(Coord pedonPos, unsigned int uav_id, double impact, double maxValForce, double coeffForce);
+
     virtual void handleStartOperation(LifecycleOperation *operation) override;
     virtual void handleStopOperation(LifecycleOperation *operation) override;
     virtual void handleCrashOperation(LifecycleOperation *operation) override;
@@ -65,6 +92,11 @@ class INET_API CloudApp : public ApplicationBase
   public:
     CloudApp() {}
     ~CloudApp();
+
+  public:
+    static double algebraicsum(double a, double b) {
+        return (a + b - (a * b));
+    }
 };
 
 } // namespace inet

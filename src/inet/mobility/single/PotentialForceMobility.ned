@@ -36,7 +36,7 @@ simple PotentialForceMobility extends MovingMobilityBase
         bool initFromDisplayString = default(true); // enables one time initialization from the subject module's display string
         double speed @unit(mps) = default(0mps); // speed of the host
         
-        double mu = default(0.2);  // dynamic friction coeficient
+        double mu = default(0.1);  // dynamic friction coeficient
         
         @class(PotentialForceMobility);
 }
