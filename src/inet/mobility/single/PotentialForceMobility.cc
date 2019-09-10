@@ -26,6 +26,11 @@ Define_Module(PotentialForceMobility);
 PotentialForceMobility::PotentialForceMobility()
 {
     speed = 0;
+    dischargeWatt = 0;
+    actualEnergy = maxEnergy = 0;
+    rechargeWatt;
+    chargingUAV = false;
+    buddy = nullptr;
 }
 
 void PotentialForceMobility::initialize(int stage)
@@ -47,6 +52,8 @@ void PotentialForceMobility::initialize(int stage)
 
         WATCH_RW(activeForce.x);
         WATCH_RW(activeForce.y);
+
+        WATCH(actualEnergy);
     }
 }
 
@@ -55,14 +62,27 @@ void PotentialForceMobility::move()
     double elapsedTime = (simTime() - lastUpdate).dbl();
     lastPosition += lastVelocity * elapsedTime;
 
-    updateVelocity();
+    updateVelocity(elapsedTime);
+    updateEnergy(elapsedTime);
 
     // do something if we reach the wall
     Coord dummyCoord;
     handleIfOutside(REFLECT, dummyCoord, lastVelocity);
 }
 
-void PotentialForceMobility::updateVelocity()
+void PotentialForceMobility::stop(void) {
+    lastVelocity = Coord::ZERO;
+    activeForce = Coord::ZERO;
+}
+
+void PotentialForceMobility::setPosition(Coord newPos) {
+    lastVelocity = Coord::ZERO;
+    activeForce = Coord::ZERO;
+    lastUpdate = simTime();
+    lastPosition = newPos;
+}
+
+void PotentialForceMobility::updateVelocity(double elapsedTime)
 {
     Coord friction = Coord::ZERO;
     if (lastVelocity.length() > 0) {
@@ -70,12 +90,28 @@ void PotentialForceMobility::updateVelocity()
     }
     lastVelocity += friction;
 
-    double elapsedTime = (simTime() - lastUpdate).dbl();
     lastVelocity = lastVelocity + activeForce * elapsedTime;
 
     if (lastVelocity.length() > speed) {
         lastVelocity.normalize();
         lastVelocity *= speed;
+    }
+}
+
+
+void PotentialForceMobility::updateEnergy(double elapsedTime)
+{
+    if (chargingUAV) {
+        actualEnergy += elapsedTime * rechargeWatt;
+        if (actualEnergy > maxEnergy) {
+            actualEnergy = maxEnergy;
+        }
+    }
+    else {
+        actualEnergy -= elapsedTime * dischargeWatt;
+        if (actualEnergy < 0) {
+            actualEnergy = 0;
+        }
     }
 }
 

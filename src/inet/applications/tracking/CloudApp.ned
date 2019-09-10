@@ -45,14 +45,36 @@ simple CloudApp like IApp
         
         double forceUpdateTime @unit(s) = default(0.5s); // force update interval 
         
-        double wp = default(1);	// force pedestrian max val
-        double kp = default(0.001);	// force pedestrian coefficient
-        double wu = default(2);	// force UAVs max val
-        double ku = default(0.01);	// force UAVs coefficient
+        double epsilon = default(0.1); // epsilon in the slope calculation
+        
+        
+        double wp = default(1);	// force uav-pedestrian max val
+        double kp = default(0.001);	// force uav-pedestrian coefficient
+        double dp = default(-1); // force uav-pedestrian distance to epsilon
+        
+        double wu = default(2);	// force uav-UAVs max val
+        double ku = default(0.01);	// force uav-UAVs coefficient
+        double du = default(-1); // force uav-UAVs distance to epsilon
+                
+        double kr = default(0.001);	// force recording coefficient
+        double dr = default(-1); // force recording distance to epsilon
+        
+        
+        double wc = default(2);	// force cars-uav max val
+        double kc = default(0.01);	// force cars-uav coefficient
+        double dc = default(-1); // force cars-uav distance to epsilon
+        
+        double wk = default(2);	// force cars-pedestrians max val
+        double kk = default(0.01);	// force cars-pedestrians coefficient
+        double dk = default(-1); // force cars-pedestrian distance to epsilon
         
         double force_exponent = default(4);	// force exponent
         
         double deattraction_impact = default(1.0); // deattraction factor when a pedestrian is being covered
+        
+        double uavMaxEnergyJ = default(130000); // maximum and initial UAV energy
+        double chargingW = default(15); // charging power
+        double dischargingW = default(85); //  discharging power
         
         double areaMinX @unit(m) = default(0 m); // min x position of the constraint area
         double areaMinY @unit(m) = default(0 m); // min y position of the constraint area

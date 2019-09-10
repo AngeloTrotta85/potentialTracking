@@ -50,11 +50,31 @@ class INET_API CloudApp : public ApplicationBase
 
     double wp;
     double kp;
+    double dp;
+
     double wu;
     double ku;
+    double du;
+
+    double kr;
+    double dr;
+
+    double wc;
+    double kc;
+    double dc;
+
+    double wk;
+    double kk;
+    double dk;
+
+    double epsilon;
 
     double force_exponent;
     double deattraction_impact;
+
+    double uavMaxEnergyJ;
+    double chargingW;
+    double dischargingW;
 
     // state
     cMessage *selfMsg = nullptr;
@@ -63,8 +83,8 @@ class INET_API CloudApp : public ApplicationBase
     // internal variables
     //std::vector< std::vector< double > > uavForcesMatrix;
     //std::vector< std::vector< double > > carForcesMatrix;
-    std::vector< IMobility * > uavMobilityModules;
-    std::vector< IMobility * > carMobilityModules;
+    std::vector< PotentialForceMobility * > uavMobilityModules;
+    std::vector< PotentialForceMobility * > carMobilityModules;
     std::vector< IMobility * > pedonsMobilityModules;
 
 
@@ -78,12 +98,14 @@ class INET_API CloudApp : public ApplicationBase
     virtual void processStart();
     virtual void processStop();
 
+    virtual void rechargeSchedule();
     virtual void updateUAVForces();
     virtual void updateMobileChargerForces();
 
-    virtual Coord calculateAttractiveForce(Coord me, Coord target, double maxVal, double coeff);
-    virtual Coord calculateRepulsiveForce(Coord me, Coord target, double maxVal, double coeff);
-    virtual double calculateAttractiveForceReduction(Coord pedonPos, unsigned int uav_id, double impact, double maxValForce, double coeffForce);
+    virtual Coord calculateAttractiveForce(Coord me, Coord target, double maxVal, double coeff, double dRef, double eps);
+    virtual Coord calculateRepulsiveForce(Coord me, Coord target, double maxVal, double coeff, double dRef, double eps);
+    virtual double calculateAttractiveForceReduction(Coord pedonPos, unsigned int uav_id, double impact, double coeffForce,
+            double dRefForce, double epsForce);
 
     virtual void handleStartOperation(LifecycleOperation *operation) override;
     virtual void handleStopOperation(LifecycleOperation *operation) override;

@@ -42,10 +42,29 @@ void CloudApp::initialize(int stage) {
 
         wp = par("wp");
         kp = par("kp");
+        dp = par("dp");
+
         wu = par("wu");
         ku = par("ku");
+        du = par("du");
+
+        kr = par("kr");
+        dr = par("dr");
+
+        wc = par("wc");
+        kc = par("kc");
+        dc = par("dc");
+
+        wk = par("wk");
+        kk = par("kk");
+        dk = par("dk");
+
         force_exponent = par("force_exponent");
-        deattraction_impact= par("deattraction_impact");
+        deattraction_impact = par("deattraction_impact");
+        uavMaxEnergyJ = par("uavMaxEnergyJ");
+        chargingW = par("chargingW");
+        dischargingW = par("dischargingW");
+        epsilon = par("epsilon");
 
         //areaMinX = floor(par("areaMinX").doubleValue());
         //areaMaxX = floor(par("areaMaxX").doubleValue());
@@ -79,7 +98,12 @@ void CloudApp::initialize(int stage) {
         carMobilityModules.resize(numCar);
 
         for (int u = 0; u < numUAV; u++) {
-            IMobility *uavMob = dynamic_cast<IMobility *> (this->getParentModule()->getParentModule()->getSubmodule("uav", u)->getSubmodule("mobility"));
+            PotentialForceMobility *uavMob = dynamic_cast<PotentialForceMobility *> (this->getParentModule()->getParentModule()->getSubmodule("uav", u)->getSubmodule("mobility"));
+            uavMob->setActualEnergy( uavMaxEnergyJ );
+            uavMob->setMaxEnergy( uavMaxEnergyJ );
+            uavMob->setChargingUav( false );
+            uavMob->setDischargeWatt( dischargingW );
+            uavMob->setRechargeWatt( chargingW );
             uavMobilityModules[u] = uavMob;
         }
         for (int p = 0; p < numPedestrian; p++) {
@@ -87,11 +111,13 @@ void CloudApp::initialize(int stage) {
             pedonsMobilityModules[p] = pedMob;
         }
         for (int c = 0; c < numCar; c++) {
-            IMobility *carMob = dynamic_cast<IMobility *> (this->getParentModule()->getParentModule()->getSubmodule("mobcharger", c)->getSubmodule("mobility"));
+            PotentialForceMobility *carMob = dynamic_cast<PotentialForceMobility *> (this->getParentModule()->getParentModule()->getSubmodule("mobcharger", c)->getSubmodule("mobility"));
             carMobilityModules[c] = carMob;
         }
 
-
+        double uavMaxEnergyJ;
+            double chargingW;
+            double dischargingW;
     }
 }
 
@@ -137,6 +163,7 @@ void CloudApp::handleMessageWhenUp(cMessage *msg) {
         }
         else if (msg == selfMsg_run) {
             //std::cerr << "handleMessageWhenUp: recognized " << msg->getFullName() << endl << std::flush;
+            rechargeSchedule();
             updateUAVForces();
             updateMobileChargerForces();
 
@@ -180,64 +207,148 @@ void CloudApp::handleCrashOperation(LifecycleOperation *operation) {
     cancelEvent(selfMsg_run);
 }
 
-Coord CloudApp::calculateAttractiveForce(Coord me, Coord target, double maxVal, double coeff) {
+Coord CloudApp::calculateAttractiveForce(Coord me, Coord target, double maxVal, double coeff, double dRef, double eps) {
 
     Coord ris = target - me;
     ris.normalize();
 
-    ris = ris * maxVal * exp(-(coeff * pow(me.distance(target), force_exponent)));
+    if (dRef < 0) {
+        ris = ris * maxVal * exp(-(coeff * pow(me.distance(target), force_exponent)));
+    }
+    else {
+        ris = ris * maxVal * exp(log(eps) * pow(me.distance(target) / dRef, force_exponent));
+    }
 
     return ris;
 }
 
-double CloudApp::calculateAttractiveForceReduction(Coord pedonPos, unsigned int uav_id, double impact, double maxValForce, double coeffForce) {
+double CloudApp::calculateAttractiveForceReduction(Coord pedonPos, unsigned int uav_id, double impact, double coeffForce, double dRefForce, double epsForce) {
     double reducingFactor = 1.0;
 
     for (unsigned int j = 0; j < uavMobilityModules.size(); j++) {
         if (uav_id != j) {
             double dist_jUAV_Ped = uavMobilityModules[j]->getCurrentPosition().distance(pedonPos);
-            double factor = 1.0 - (impact *  exp(-(coeffForce * pow(dist_jUAV_Ped, force_exponent))));
+            double val;
+
+            if (dRefForce < 0) {
+                val = exp(-(coeffForce * pow(dist_jUAV_Ped, force_exponent)));
+            }
+            else {
+                val = exp(log(epsForce) * pow(dist_jUAV_Ped / dRefForce, force_exponent));
+            }
+
+            double factor = 1.0 - (impact * val);
             reducingFactor *= factor;
         }
     }
     return reducingFactor;
 }
 
-Coord CloudApp::calculateRepulsiveForce(Coord me, Coord target, double maxVal, double coeff) {
+Coord CloudApp::calculateRepulsiveForce(Coord me, Coord target, double maxVal, double coeff, double dRef, double eps) {
 
     Coord ris = me - target;
     ris.normalize();
 
-    ris = ris * maxVal * exp(-(coeff * pow(me.distance(target), force_exponent)));
+    if (dRef < 0) {
+        ris = ris * maxVal * exp(-(coeff * pow(me.distance(target), force_exponent)));
+    }
+    else {
+        ris = ris * maxVal * exp(log(eps) * pow(me.distance(target) / dRef, force_exponent));
+    }
 
     return ris;
 }
 
-void CloudApp::updateUAVForces() {
-    EV << "Updating UAV Forces!!!" << endl;
+void CloudApp::rechargeSchedule() {
+    //EV << "Scheduling the recharges!!!" << endl;
+    std::vector< std::pair< PotentialForceMobility *, PotentialForceMobility * > > charging_assignment;
 
-    for (unsigned int i = 0; i < uavMobilityModules.size(); i++) {
+    for (auto& cass : charging_assignment) {
+        PotentialForceMobility *auav = cass.first;
+        PotentialForceMobility *acar = cass.second;
+
+        auav->setChargingUav(true);
+        auav->setBuddy(acar);
+        auav->setPosition(acar->getCurrentPosition());
+        auav->stop();
+
+        acar->setChargingUav(true);
+        acar->setBuddy(auav);
+        acar->stop();
+    }
+
+    // free UAV and charging stations if UAV is fully charged
+    for (auto& puav : uavMobilityModules) {
+        if ((puav->isChargingUav()) && (puav->getActualEnergy() >= puav->getMaxEnergy())) {
+
+            PotentialForceMobility *pcar = puav->getBuddy();
+
+            pcar->setChargingUav(false);
+            pcar->setBuddy(nullptr);
+
+            puav->setChargingUav(false);
+            puav->setBuddy(nullptr);
+        }
+    }
+}
+
+void CloudApp::updateUAVForces() {
+    //EV << "Updating UAV Forces!!!" << endl;
+
+    for (unsigned int u = 0; u < uavMobilityModules.size(); u++) {
         Coord uavForce = Coord::ZERO;
 
-        for (unsigned int p = 0; p < pedonsMobilityModules.size(); p++) {
-            Coord actPedForce = calculateAttractiveForce(uavMobilityModules[i]->getCurrentPosition(), pedonsMobilityModules[p]->getCurrentPosition(), wp, kp);
-            double reducingFactor = calculateAttractiveForceReduction(pedonsMobilityModules[p]->getCurrentPosition(), i, deattraction_impact, wp, kp);
+        // update the force on the flying UAVs only
+        if (!uavMobilityModules[u]->isChargingUav()) {
 
-            uavForce += actPedForce * reducingFactor;
-        }
+            // add attractive force from the pedestrians
+            for (unsigned int p = 0; p < pedonsMobilityModules.size(); p++) {
+                Coord actPedForce = calculateAttractiveForce(uavMobilityModules[u]->getCurrentPosition(), pedonsMobilityModules[p]->getCurrentPosition(), wp, kp, dp, epsilon);
+                double reducingFactor = calculateAttractiveForceReduction(pedonsMobilityModules[p]->getCurrentPosition(), u, deattraction_impact, kr, dr, epsilon);
 
-        for (unsigned int j = 0; j < uavMobilityModules.size(); j++) {
-            if (i != j) {
-                uavForce += calculateRepulsiveForce(uavMobilityModules[i]->getCurrentPosition(), uavMobilityModules[j]->getCurrentPosition(), wu, ku);
+                uavForce += actPedForce * reducingFactor;
             }
+
+            //add repulsive forces from the other flying UAVs
+            for (unsigned int j = 0; j < uavMobilityModules.size(); j++) {
+                if ((u != j) && (!uavMobilityModules[j]->isChargingUav())) {
+                    uavForce += calculateRepulsiveForce(uavMobilityModules[u]->getCurrentPosition(), uavMobilityModules[j]->getCurrentPosition(), wu, ku, du, epsilon);
+                }
+            }
+
         }
 
-        static_cast<PotentialForceMobility *>(uavMobilityModules[i])->setActiveForce(uavForce);
+        uavMobilityModules[u]->setActiveForce(uavForce);
     }
 }
 
 void CloudApp::updateMobileChargerForces() {
-    EV << "Updating Mobile Charger Forces!!!" << endl;
+    //EV << "Updating Mobile Charger Forces!!!" << endl;
+
+    for (unsigned int c = 0; c < carMobilityModules.size(); c++) {
+        Coord carForce = Coord::ZERO;
+
+        if (!carMobilityModules[c]->isChargingUav()) {
+
+            // add attractive force from the flying UAVs
+            for (unsigned int u = 0; u < uavMobilityModules.size(); u++) {
+                if (!uavMobilityModules[u]->isChargingUav()) {
+                    Coord actUAVForce = calculateAttractiveForce(carMobilityModules[c]->getCurrentPosition(), uavMobilityModules[u]->getCurrentPosition(), wc, kc, dc, epsilon);
+                    double reducingFactor = 1.0 - (uavMobilityModules[u]->getActualEnergy() / uavMobilityModules[u]->getMaxEnergy());
+
+                    carForce += actUAVForce * reducingFactor;
+                }
+            }
+
+            //add repulsive forces from the pedestrians
+            for (unsigned int p = 0; p < pedonsMobilityModules.size(); p++) {
+                carForce += calculateRepulsiveForce(carMobilityModules[c]->getCurrentPosition(), pedonsMobilityModules[p]->getCurrentPosition(), wk, kk, dk, epsilon);
+            }
+
+        }
+
+        carMobilityModules[c]->setActiveForce(carForce);
+    }
 }
 
 

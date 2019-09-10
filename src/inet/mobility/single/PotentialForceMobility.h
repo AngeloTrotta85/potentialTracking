@@ -37,6 +37,14 @@ class INET_API PotentialForceMobility : public MovingMobilityBase
     Coord activeForce;
     double mu;
 
+    double actualEnergy;
+    double maxEnergy;
+    double dischargeWatt;
+    double rechargeWatt;
+
+    bool chargingUAV;
+    PotentialForceMobility *buddy;
+
 
   protected:
     virtual int numInitStages() const override { return NUM_INIT_STAGES; }
@@ -48,15 +56,35 @@ class INET_API PotentialForceMobility : public MovingMobilityBase
     virtual void move() override;
 
     /** @brief Update the actual velocity based on the force*/
-    virtual void updateVelocity();
+    virtual void updateVelocity(double elapsedTime);
+
+    /** @brief Update the actual residual energy*/
+    virtual void updateEnergy(double elapsedTime);
 
   public:
     virtual double getMaxSpeed() const override { return speed; }
     PotentialForceMobility();
 
+    void stop(void);
+    void setPosition(Coord newPos);
+
     const Coord& getActiveForce() const { return activeForce; }
     void setActiveForce(const Coord& activeForce) { this->activeForce = activeForce; }
 
+    double getActualEnergy() const { return actualEnergy;   }
+    void setActualEnergy(double actualEnergy) { this->actualEnergy = actualEnergy; }
+
+    void setMaxEnergy(double maxEnergy) { this->maxEnergy = maxEnergy; }
+    double getMaxEnergy() const { return maxEnergy;   }
+
+    void setRechargeWatt(double rechargeWatt) { this->rechargeWatt = rechargeWatt; }
+    void setDischargeWatt(double dischargeWatt) { this->dischargeWatt = dischargeWatt; }
+
+    bool isChargingUav() const { return chargingUAV; }
+    void setChargingUav(bool chargingUav) { chargingUAV = chargingUav; }
+
+    PotentialForceMobility* getBuddy() { return buddy; }
+    void setBuddy(PotentialForceMobility* buddy) { this->buddy = buddy; }
 };
 
 } // namespace inet
