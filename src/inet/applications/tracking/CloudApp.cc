@@ -65,6 +65,7 @@ void CloudApp::initialize(int stage) {
         chargingW = par("chargingW");
         dischargingW = par("dischargingW");
         epsilon = par("epsilon");
+        rechargeTimeOffset = par("rechargeTimeOffset");
 
         //areaMinX = floor(par("areaMinX").doubleValue());
         //areaMaxX = floor(par("areaMaxX").doubleValue());
@@ -122,8 +123,9 @@ void CloudApp::initialize(int stage) {
 }
 
 void CloudApp::finish() {
-    //recordScalar("packets sent", numSent);
-    //recordScalar("packets received", numReceived);
+
+    recordScalar("lifetime", simTime());
+
     ApplicationBase::finish();
 }
 
@@ -132,6 +134,8 @@ void CloudApp::processStart() {
         selfMsg->setKind(STOP);
         scheduleAt(stopTime, selfMsg);
     }
+
+    nextRechargeTime = simTime() + rechargeTimeOffset;
 
     scheduleAt(simTime() + forceUpdateTime, selfMsg_run);
 }
@@ -166,6 +170,7 @@ void CloudApp::handleMessageWhenUp(cMessage *msg) {
             rechargeSchedule();
             updateUAVForces();
             updateMobileChargerForces();
+            checkLifetime();
 
             //std::cerr << "handleMessageWhenUp: OK updated forces" << endl << std::flush;
 
@@ -261,21 +266,6 @@ Coord CloudApp::calculateRepulsiveForce(Coord me, Coord target, double maxVal, d
 
 void CloudApp::rechargeSchedule() {
     //EV << "Scheduling the recharges!!!" << endl;
-    std::vector< std::pair< PotentialForceMobility *, PotentialForceMobility * > > charging_assignment;
-
-    for (auto& cass : charging_assignment) {
-        PotentialForceMobility *auav = cass.first;
-        PotentialForceMobility *acar = cass.second;
-
-        auav->setChargingUav(true);
-        auav->setBuddy(acar);
-        auav->setPosition(acar->getCurrentPosition());
-        auav->stop();
-
-        acar->setChargingUav(true);
-        acar->setBuddy(auav);
-        acar->stop();
-    }
 
     // free UAV and charging stations if UAV is fully charged
     for (auto& puav : uavMobilityModules) {
@@ -289,6 +279,84 @@ void CloudApp::rechargeSchedule() {
             puav->setChargingUav(false);
             puav->setBuddy(nullptr);
         }
+    }
+
+    if (simTime() >= nextRechargeTime) {
+        std::list< std::tuple<PotentialForceMobility *, double> > flyingUAVs;
+
+        // check UAV to get off from the charging station
+        for (auto& puav : uavMobilityModules) {
+            if (puav->isChargingUav()) {
+                double energyRatio = puav->getActualEnergy() / puav->getMaxEnergy();
+                double worseUAV = 0;
+
+                for (auto& puavcheck : uavMobilityModules) {
+                    if ( (!puavcheck->isChargingUav()) && (puavcheck->getActualEnergy() < puav->getActualEnergy()) ) {
+                        ++worseUAV;
+                    }
+                }
+
+                //AOB probability
+                //double prob = pow((energyRatio), 1.0 / (worseUAV + 1.0) );      // vers.1
+                double prob = 1.0 - pow((1.0 - energyRatio), 1.0 / (worseUAV + 1.0) );      // vers.2
+
+                if (dblrand() < prob) {
+                    PotentialForceMobility *pcar = puav->getBuddy();
+
+                    pcar->setChargingUav(false);
+                    pcar->setBuddy(nullptr);
+
+                    puav->setChargingUav(false);
+                    puav->setBuddy(nullptr);
+                }
+            }
+        }
+
+        // get and order (energy based) all the flying UAVs
+        for (auto& puav : uavMobilityModules) {
+            if (!puav->isChargingUav()) {
+                flyingUAVs.push_back(std::make_tuple(puav, puav->getActualEnergy()));
+            }
+        }
+        flyingUAVs.sort(CloudApp::energySort);
+
+        //for each UAV check to recharge
+        for (auto& t_uav : flyingUAVs) {
+            PotentialForceMobility *puav = std::get<0>(t_uav);
+
+            double energyRatio = puav->getActualEnergy() / puav->getMaxEnergy();
+
+            // get and order (uAV-distance based) all the free charging stations
+            std::list< std::tuple<PotentialForceMobility *, Coord, Coord > > freeChargers;
+            for (auto& pcar : carMobilityModules) {
+                if (!pcar->isChargingUav()) {
+                    freeChargers.push_back(std::make_tuple(pcar, pcar->getCurrentPosition(), puav->getCurrentPosition()));
+                }
+            }
+            freeChargers.sort(CloudApp::distanceSort);
+
+            //check if to charge
+            for (auto& t_car : freeChargers) {
+                PotentialForceMobility *pcar = std::get<0>(t_car);
+                double dist = puav->getCurrentPosition().distance(pcar->getCurrentPosition());
+
+                //AOB probability
+                double prob = pow((1.0 - energyRatio),((dist/100.0) + 1.0));
+
+                if (dblrand() < prob) {
+
+                    puav->setChargingUav(true);
+                    puav->setBuddy(pcar);
+
+                    pcar->setChargingUav(true);
+                    pcar->setBuddy(puav);
+
+                    break;
+                }
+            }
+        }
+
+        nextRechargeTime = simTime() + rechargeTimeOffset;
     }
 }
 
@@ -316,6 +384,9 @@ void CloudApp::updateUAVForces() {
                 }
             }
 
+        }
+        else {
+            uavForce = uavMobilityModules[u]->getBuddy()->getCurrentPosition() - uavMobilityModules[u]->getCurrentPosition();
         }
 
         uavMobilityModules[u]->setActiveForce(uavForce);
@@ -351,7 +422,13 @@ void CloudApp::updateMobileChargerForces() {
     }
 }
 
-
+void CloudApp::checkLifetime() {
+    for (unsigned int u = 0; u < uavMobilityModules.size(); u++) {
+        if (uavMobilityModules[u]->getActualEnergy() <= 0) {
+            endSimulation();
+        }
+    }
+}
 
 } // namespace inet
 

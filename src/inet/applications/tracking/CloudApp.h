@@ -20,6 +20,7 @@
 #define __INET_CLOUDAPP_H
 
 #include <vector>
+#include <list>
 
 #include "inet/common/geometry/common/Coord.h"
 #include "inet/common/INETDefs.h"
@@ -76,6 +77,9 @@ class INET_API CloudApp : public ApplicationBase
     double chargingW;
     double dischargingW;
 
+    simtime_t nextRechargeTime;
+    double rechargeTimeOffset;
+
     // state
     cMessage *selfMsg = nullptr;
     cMessage *selfMsg_run = nullptr;
@@ -101,6 +105,7 @@ class INET_API CloudApp : public ApplicationBase
     virtual void rechargeSchedule();
     virtual void updateUAVForces();
     virtual void updateMobileChargerForces();
+    virtual void checkLifetime();
 
     virtual Coord calculateAttractiveForce(Coord me, Coord target, double maxVal, double coeff, double dRef, double eps);
     virtual Coord calculateRepulsiveForce(Coord me, Coord target, double maxVal, double coeff, double dRef, double eps);
@@ -118,6 +123,14 @@ class INET_API CloudApp : public ApplicationBase
   public:
     static double algebraicsum(double a, double b) {
         return (a + b - (a * b));
+    }
+
+    static bool energySort(const std::tuple<PotentialForceMobility *, double> &first, const std::tuple<PotentialForceMobility *, double> &second) {
+        return (std::get<1>(first) < std::get<1>(second));
+    }
+
+    static bool distanceSort(const std::tuple<PotentialForceMobility *, Coord, Coord > &first, const std::tuple<PotentialForceMobility *, Coord, Coord > &second) {
+        return (std::get<1>(first).distance(std::get<2>(first)) < std::get<1>(second).distance(std::get<2>(second)));
     }
 };
 

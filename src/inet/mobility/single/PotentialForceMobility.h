@@ -85,6 +85,7 @@ class INET_API PotentialForceMobility : public MovingMobilityBase
 
     PotentialForceMobility* getBuddy() { return buddy; }
     void setBuddy(PotentialForceMobility* buddy) { this->buddy = buddy; }
+
 };
 
 } // namespace inet

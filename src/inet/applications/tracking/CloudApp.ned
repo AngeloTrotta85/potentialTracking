@@ -76,6 +76,8 @@ simple CloudApp like IApp
         double chargingW = default(15); // charging power
         double dischargingW = default(85); //  discharging power
         
+        double rechargeTimeOffset @unit(s) = default(30 s);
+        
         double areaMinX @unit(m) = default(0 m); // min x position of the constraint area
         double areaMinY @unit(m) = default(0 m); // min y position of the constraint area
         double areaMaxX @unit(m) = default(0 m); // max x position of the constraint area

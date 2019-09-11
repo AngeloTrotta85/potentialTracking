@@ -54,6 +54,7 @@ void PotentialForceMobility::initialize(int stage)
         WATCH_RW(activeForce.y);
 
         WATCH(actualEnergy);
+        WATCH(chargingUAV);
     }
 }
 
