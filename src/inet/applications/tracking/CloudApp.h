@@ -28,6 +28,7 @@
 #include "inet/applications/base/ApplicationBase.h"
 
 #include "../../mobility/single/PotentialForceMobility.h"
+#include "../../mobility/single/PedestrianMobility.h"
 
 namespace inet {
 
@@ -44,10 +45,10 @@ class INET_API CloudApp : public ApplicationBase
     simtime_t stopTime;
     simtime_t forceUpdateTime;
 
-    //unsigned int areaMinX;
-    //unsigned int areaMaxX;
-    //unsigned int areaMinY;
-    //unsigned int areaMaxY;
+    unsigned int areaMinX;
+    unsigned int areaMaxX;
+    unsigned int areaMinY;
+    unsigned int areaMaxY;
 
     double wp;
     double kp;
@@ -80,6 +81,8 @@ class INET_API CloudApp : public ApplicationBase
     simtime_t nextRechargeTime;
     double rechargeTimeOffset;
 
+    double coverageDistance;
+
     // state
     cMessage *selfMsg = nullptr;
     cMessage *selfMsg_run = nullptr;
@@ -90,6 +93,11 @@ class INET_API CloudApp : public ApplicationBase
     std::vector< PotentialForceMobility * > uavMobilityModules;
     std::vector< PotentialForceMobility * > carMobilityModules;
     std::vector< IMobility * > pedonsMobilityModules;
+    std::vector< bool > pedonsKnowledge;
+    std::vector< std::vector< double > > coverageMap;
+    //std::vector< std::pair<Coord, double> >coveragePointsVect;
+    //std::vector< Coord >coveragePointsVect;
+    std::vector< std::pair <Coord, simtime_t> > lastRandom;
 
 
   protected:
@@ -102,11 +110,15 @@ class INET_API CloudApp : public ApplicationBase
     virtual void processStart();
     virtual void processStop();
 
+    void updatePedestrianKnowledge(void);
+
     virtual void rechargeSchedule();
     virtual void updateUAVForces();
     virtual void updateMobileChargerForces();
+    virtual void updatePedestrianForces();
     virtual void checkLifetime();
 
+    virtual Coord calculateAttractiveForcePedestrianGroup(Coord me, Coord target, double maxVal, double coeff, double dRef, double eps);
     virtual Coord calculateAttractiveForce(Coord me, Coord target, double maxVal, double coeff, double dRef, double eps);
     virtual Coord calculateRepulsiveForce(Coord me, Coord target, double maxVal, double coeff, double dRef, double eps);
     virtual double calculateAttractiveForceReduction(Coord pedonPos, unsigned int uav_id, double impact, double coeffForce,

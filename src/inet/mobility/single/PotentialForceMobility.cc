@@ -63,12 +63,22 @@ void PotentialForceMobility::move()
     double elapsedTime = (simTime() - lastUpdate).dbl();
     lastPosition += lastVelocity * elapsedTime;
 
+    if (lastPosition.x < constraintAreaMin.x) lastPosition.x = constraintAreaMin.x;
+    if (lastPosition.x > constraintAreaMax.x) lastPosition.x = constraintAreaMax.x;
+    if (lastPosition.y < constraintAreaMin.y) lastPosition.y = constraintAreaMin.y;
+    if (lastPosition.y > constraintAreaMax.x) lastPosition.y = constraintAreaMax.x;
+
+    //std::cerr << "move 0" << endl << std::flush;
     updateVelocity(elapsedTime);
+    //std::cerr << "move 1" << endl << std::flush;
     updateEnergy(elapsedTime);
+    //std::cerr << "move 2" << endl << std::flush;
 
     // do something if we reach the wall
     Coord dummyCoord;
     handleIfOutside(REFLECT, dummyCoord, lastVelocity);
+
+    myPosition = lastPosition;
 }
 
 void PotentialForceMobility::stop(void) {
@@ -102,7 +112,13 @@ void PotentialForceMobility::updateVelocity(double elapsedTime)
 
 void PotentialForceMobility::updateEnergy(double elapsedTime)
 {
-    if (chargingUAV) {
+    //std::cerr << simTime() << " speed " << speed << "; lastposition: " << lastPosition << std::flush;
+    //std::cerr << " - buddy: " << buddy << endl << std::flush;
+    if (    (chargingUAV) &&
+            (buddy != nullptr) &&
+            (buddy->myPosition.distance(lastPosition) <= 2)
+            ){
+    //if (chargingUAV) {
         actualEnergy += elapsedTime * rechargeWatt;
         if (actualEnergy > maxEnergy) {
             actualEnergy = maxEnergy;

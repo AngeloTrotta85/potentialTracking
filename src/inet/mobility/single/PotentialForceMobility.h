@@ -45,6 +45,9 @@ class INET_API PotentialForceMobility : public MovingMobilityBase
     bool chargingUAV;
     PotentialForceMobility *buddy;
 
+  public:
+    Coord myPosition;
+
 
   protected:
     virtual int numInitStages() const override { return NUM_INIT_STAGES; }

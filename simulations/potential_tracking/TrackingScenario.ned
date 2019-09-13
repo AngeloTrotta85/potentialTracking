@@ -31,8 +31,10 @@ network TrackingScenario
         int numChargingCars = default(1);
         int numPedestrians = default(1);
         
+        bool hasVisualizer = default(false);
+        
     submodules:
-        visualizer: <default("IntegratedCanvasVisualizer")> like IIntegratedVisualizer if hasVisualizer() {
+        visualizer: <default("IntegratedCanvasVisualizer")> like IIntegratedVisualizer if hasVisualizer {
             parameters:
                 @display("p=100,50");
         }    

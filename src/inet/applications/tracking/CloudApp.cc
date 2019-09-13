@@ -66,11 +66,12 @@ void CloudApp::initialize(int stage) {
         dischargingW = par("dischargingW");
         epsilon = par("epsilon");
         rechargeTimeOffset = par("rechargeTimeOffset");
+        coverageDistance = par("coverageDistance");
 
-        //areaMinX = floor(par("areaMinX").doubleValue());
-        //areaMaxX = floor(par("areaMaxX").doubleValue());
-        //areaMinY = floor(par("areaMinY").doubleValue());
-        //areaMaxY = floor(par("areaMaxY").doubleValue());
+        areaMinX = floor(par("areaMinX").doubleValue());
+        areaMaxX = floor(par("areaMaxX").doubleValue());
+        areaMinY = floor(par("areaMinY").doubleValue());
+        areaMaxY = floor(par("areaMaxY").doubleValue());
 
         forceUpdateTime = par("forceUpdateTime");
 
@@ -95,7 +96,9 @@ void CloudApp::initialize(int stage) {
         int numCar = this->getParentModule()->getParentModule()->getSubmodule("mobcharger", 0)->getVectorSize();
 
         uavMobilityModules.resize(numUAV);
+        lastRandom.resize(numUAV, std::make_pair(Coord::ZERO, simTime()));
         pedonsMobilityModules.resize(numPedestrian);
+        pedonsKnowledge.resize(numPedestrian, false);
         carMobilityModules.resize(numCar);
 
         for (int u = 0; u < numUAV; u++) {
@@ -116,9 +119,10 @@ void CloudApp::initialize(int stage) {
             carMobilityModules[c] = carMob;
         }
 
-        double uavMaxEnergyJ;
-            double chargingW;
-            double dischargingW;
+        coverageMap.resize(areaMaxX);
+        for (auto& vm : coverageMap) {
+            vm.resize(areaMaxY, 0);
+        }
     }
 }
 
@@ -167,10 +171,19 @@ void CloudApp::handleMessageWhenUp(cMessage *msg) {
         }
         else if (msg == selfMsg_run) {
             //std::cerr << "handleMessageWhenUp: recognized " << msg->getFullName() << endl << std::flush;
+            //std::cerr << "selfMsg_run 0" << endl << std::flush;
+            updatePedestrianKnowledge();
+            //std::cerr << "selfMsg_run 1" << endl << std::flush;
             rechargeSchedule();
+            //std::cerr << "selfMsg_run 2" << endl << std::flush;
             updateUAVForces();
+            //std::cerr << "selfMsg_run 3" << endl << std::flush;
             updateMobileChargerForces();
+            //std::cerr << "selfMsg_run 4" << endl << std::flush;
+            updatePedestrianForces();
+            //std::cerr << "selfMsg_run 5" << endl << std::flush;
             checkLifetime();
+            //std::cerr << "selfMsg_run 6" << endl << std::flush;
 
             //std::cerr << "handleMessageWhenUp: OK updated forces" << endl << std::flush;
 
@@ -210,6 +223,37 @@ void CloudApp::handleStopOperation(LifecycleOperation *operation)
 void CloudApp::handleCrashOperation(LifecycleOperation *operation) {
     cancelEvent(selfMsg);
     cancelEvent(selfMsg_run);
+}
+
+void CloudApp::updatePedestrianKnowledge(void) {
+    for (unsigned int p = 0; p < pedonsMobilityModules.size(); p++) {
+        IMobility *pmob = pedonsMobilityModules[p];
+        bool covered = false;
+
+        for (unsigned int u = 0; u < uavMobilityModules.size(); u++) {
+            if(pmob->getCurrentPosition().distance(uavMobilityModules[u]->getCurrentPosition()) <= coverageDistance) {
+                covered = true;
+                break;
+            }
+        }
+
+        pedonsKnowledge[p] = covered;
+    }
+}
+
+Coord CloudApp::calculateAttractiveForcePedestrianGroup(Coord me, Coord target, double maxVal, double coeff, double dRef, double eps) {
+
+    Coord ris = target - me;
+    ris.normalize();
+
+    if (dRef < 0) {
+        ris = ris * maxVal * (1.0 - exp(-(coeff * pow(me.distance(target), force_exponent))));
+    }
+    else {
+        ris = ris * maxVal * (1.0 - exp(log(eps) * pow(me.distance(target) / dRef, force_exponent)));
+    }
+
+    return ris;
 }
 
 Coord CloudApp::calculateAttractiveForce(Coord me, Coord target, double maxVal, double coeff, double dRef, double eps) {
@@ -362,6 +406,7 @@ void CloudApp::rechargeSchedule() {
 
 void CloudApp::updateUAVForces() {
     //EV << "Updating UAV Forces!!!" << endl;
+    bool coverageMapUpdated = false;
 
     for (unsigned int u = 0; u < uavMobilityModules.size(); u++) {
         Coord uavForce = Coord::ZERO;
@@ -371,10 +416,12 @@ void CloudApp::updateUAVForces() {
 
             // add attractive force from the pedestrians
             for (unsigned int p = 0; p < pedonsMobilityModules.size(); p++) {
-                Coord actPedForce = calculateAttractiveForce(uavMobilityModules[u]->getCurrentPosition(), pedonsMobilityModules[p]->getCurrentPosition(), wp, kp, dp, epsilon);
-                double reducingFactor = calculateAttractiveForceReduction(pedonsMobilityModules[p]->getCurrentPosition(), u, deattraction_impact, kr, dr, epsilon);
+                if (pedonsKnowledge[p]) {
+                    Coord actPedForce = calculateAttractiveForce(uavMobilityModules[u]->getCurrentPosition(), pedonsMobilityModules[p]->getCurrentPosition(), wp, kp, dp, epsilon);
+                    double reducingFactor = calculateAttractiveForceReduction(pedonsMobilityModules[p]->getCurrentPosition(), u, deattraction_impact, kr, dr, epsilon);
 
-                uavForce += actPedForce * reducingFactor;
+                    uavForce += actPedForce * reducingFactor;
+                }
             }
 
             //add repulsive forces from the other flying UAVs
@@ -382,6 +429,15 @@ void CloudApp::updateUAVForces() {
                 if ((u != j) && (!uavMobilityModules[j]->isChargingUav())) {
                     uavForce += calculateRepulsiveForce(uavMobilityModules[u]->getCurrentPosition(), uavMobilityModules[j]->getCurrentPosition(), wu, ku, du, epsilon);
                 }
+            }
+
+            // if no pedestrian/uav close, make coverage
+            if(uavForce.length() < 0.1) {
+                if ((simTime() - lastRandom[u].second) > 30) {
+                    lastRandom[u].first = Coord(dblrand() - 0.5, dblrand() - 0.5) * 5.0;
+                    lastRandom[u].second = simTime();
+                }
+                uavForce = lastRandom[u].first;
             }
 
         }
@@ -421,6 +477,81 @@ void CloudApp::updateMobileChargerForces() {
         carMobilityModules[c]->setActiveForce(carForce);
     }
 }
+
+void CloudApp::updatePedestrianForces() {
+    /*for (unsigned int p = 1; p < pedonsMobilityModules.size(); p++) {
+        cModule *cmPed = dynamic_cast<cModule *>(pedonsMobilityModules[p]);
+
+        if (cmPed->hasSubmodules()) {
+            PotentialForceMobility *pFmob = dynamic_cast<PotentialForceMobility *>(cmPed->getSubmodule("element", 1));
+            Coord pedForce = Coord::ZERO;
+
+            pedForce += calculateAttractiveForcePedestrianGroup(pFmob->getCurrentPosition(),
+                    pedonsMobilityModules[0]->getCurrentPosition(), 5, 0.01, 20, 0.1);
+
+            //for (unsigned int p1 = 1; p1 < pedonsMobilityModules.size(); p1++) {
+            //    if (p != p1) {
+            //        PotentialForceMobility *pFmob1 = dynamic_cast<PotentialForceMobility *>((dynamic_cast<cModule *>(pedonsMobilityModules[p1]))->getSubmodule("element", 1));
+            //        pedForce += calculateRepulsiveForce(pFmob->getCurrentPosition(), pFmob1->getCurrentPosition(), wu, ku, du, epsilon);
+            //    }
+            //}
+
+            pFmob->setActiveForce(pedForce);
+        }
+        else {
+            break;
+        }
+    }*/
+
+    /*for (unsigned int p = 1; p < pedonsMobilityModules.size(); p++) {
+        PedestrianMobility *pFmob = dynamic_cast<PedestrianMobility *>(pedonsMobilityModules[p]);
+        Coord leadVel = pedonsMobilityModules[0]->getCurrentVelocity();
+
+        if ((pFmob) && (dblrand() < 0.05)) {
+        //if (pFmob) {
+            Coord newVel = leadVel;
+
+            newVel += calculateAttractiveForcePedestrianGroup(pedonsMobilityModules[p]->getCurrentPosition(),
+                    pedonsMobilityModules[0]->getCurrentPosition(), 0.2, 0.01, 20, 0.2);
+
+            newVel += Coord(dblrand(), dblrand());
+
+            pFmob->setVelocity(newVel);
+        }
+    }*/
+
+    /*for (unsigned int p = 1; p < pedonsMobilityModules.size(); p++) {
+        VirtualSpringMobility *pFmob = dynamic_cast<VirtualSpringMobility *>(pedonsMobilityModules[p]);
+
+        if (pFmob) {
+            Coord myPos = pFmob->getCurrentPosition();
+
+            // clear everything
+            pFmob->clearVirtualSprings();
+
+            for (unsigned int p1 = 0; p1 < pedonsMobilityModules.size(); p1++) {
+                if (p != p1) {
+                    Coord neighPos = pedonsMobilityModules[p1]->getCurrentPosition();
+                    double dist = neighPos.distance(myPos);
+                    double l0 = 10;
+
+                    if (dist < 2000.0) {
+
+                        double springDispl = l0 - dist;
+
+                        Coord uVec = neighPos - myPos;
+                        uVec.normalize();
+
+                        //EV << "Setting force with displacement: " << springDispl << " (distance: " << distance << ")" << endl;
+
+                        pFmob->addVirtualSpring(uVec, 0.1, l0, springDispl);
+                    }
+                }
+            }
+        }
+    }*/
+}
+
 
 void CloudApp::checkLifetime() {
     for (unsigned int u = 0; u < uavMobilityModules.size(); u++) {

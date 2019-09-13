@@ -68,6 +68,8 @@ simple CloudApp like IApp
         double kk = default(0.01);	// force cars-pedestrians coefficient
         double dk = default(-1); // force cars-pedestrian distance to epsilon
         
+        double coverageDistance @unit(m) = default(20 m); 
+        
         double force_exponent = default(4);	// force exponent
         
         double deattraction_impact = default(1.0); // deattraction factor when a pedestrian is being covered
