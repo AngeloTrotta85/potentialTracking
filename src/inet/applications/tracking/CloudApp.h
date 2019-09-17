@@ -37,6 +37,24 @@ namespace inet {
  */
 class INET_API CloudApp : public ApplicationBase
 {
+public:
+    typedef enum chargingType_t {
+        MOBILE_CAR,
+        FIXED_STATION,
+        NO_CHARGER
+    } chargingType_t;
+
+    typedef enum chargingScheduling_t {
+        STIMULUS_SCHEDULING,
+        GREEDY_SCHEDULING
+    } chargingScheduling_t;
+
+    typedef enum crowdFollow_t {
+        CROWD_NO,
+        CROWD_KNOWN,
+        CROWD_CLUSTER
+    } crowdFollow_t;
+
   protected:
     enum SelfMsgKinds { START = 1, SEND, STOP };
 
@@ -69,12 +87,17 @@ class INET_API CloudApp : public ApplicationBase
     double kk;
     double dk;
 
+    double wg;
+    double kg;
+    double dg;
+
     double epsilon;
 
     double force_exponent;
     double deattraction_impact;
 
     double uavMaxEnergyJ;
+    double uavInitEnergyJ;
     double chargingW;
     double dischargingW;
 
@@ -83,21 +106,45 @@ class INET_API CloudApp : public ApplicationBase
 
     double coverageDistance;
 
+    bool keepFullMap;
+    double forceMapOffset;
+    double forceDrawCoefficient;
+    std::string fileData;
+
+    double statisticOffset;
+
+    std::string chargingType;
+    chargingType_t cType;
+
+    std::string chargingScheduling;
+    chargingScheduling_t cScheduling;
+
+    std::string crowdFollow;
+    crowdFollow_t crowd;
+
+    int numClusterCrowd;
+
     // state
     cMessage *selfMsg = nullptr;
     cMessage *selfMsg_run = nullptr;
+    cMessage *selfMsg_stat = nullptr;
 
     // internal variables
-    //std::vector< std::vector< double > > uavForcesMatrix;
-    //std::vector< std::vector< double > > carForcesMatrix;
+    std::vector< std::vector< std::vector< Coord > > > uavForcesMatrix;
+    std::vector< std::vector< std::vector< Coord > > > carForcesMatrix;
+
     std::vector< PotentialForceMobility * > uavMobilityModules;
     std::vector< PotentialForceMobility * > carMobilityModules;
     std::vector< IMobility * > pedonsMobilityModules;
     std::vector< bool > pedonsKnowledge;
-    std::vector< std::vector< double > > coverageMap;
+    //std::vector< std::vector< double > > coverageMap;
     //std::vector< std::pair<Coord, double> >coveragePointsVect;
     //std::vector< Coord >coveragePointsVect;
     std::vector< std::pair <Coord, simtime_t> > lastRandom;
+
+
+    std::vector< std::vector< double > > pedIsCovered;
+    std::vector< std::vector< double > > pedCoverage;
 
 
   protected:
@@ -111,9 +158,12 @@ class INET_API CloudApp : public ApplicationBase
     virtual void processStop();
 
     void updatePedestrianKnowledge(void);
+    void makeStat(void);
 
     virtual void rechargeSchedule();
+    Coord calculateUAVForce(int u, Coord pos);
     virtual void updateUAVForces();
+    Coord calculateMobileChargerForce(int c, Coord pos);
     virtual void updateMobileChargerForces();
     virtual void updatePedestrianForces();
     virtual void checkLifetime();
@@ -123,6 +173,8 @@ class INET_API CloudApp : public ApplicationBase
     virtual Coord calculateRepulsiveForce(Coord me, Coord target, double maxVal, double coeff, double dRef, double eps);
     virtual double calculateAttractiveForceReduction(Coord pedonPos, unsigned int uav_id, double impact, double coeffForce,
             double dRefForce, double epsForce);
+
+    virtual void calculateKmeans(std::vector< Coord > &cHeads);
 
     virtual void handleStartOperation(LifecycleOperation *operation) override;
     virtual void handleStopOperation(LifecycleOperation *operation) override;

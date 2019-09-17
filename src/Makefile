@@ -30,7 +30,7 @@ PROJECTRELATIVE_PATH = src
 O = $(PROJECT_OUTPUT_DIR)/$(CONFIGNAME)/$(PROJECTRELATIVE_PATH)
 
 # Object files for local .cc, .msg and .sm files
-OBJS = $O/inet/applications/tracking/CloudApp.o $O/inet/mobility/single/PedestrianMobility.o $O/inet/mobility/single/PotentialForceMobility.o
+OBJS = $O/inet/applications/tracking/CloudApp.o $O/inet/mobility/single/DelayedTractorMobility.o $O/inet/mobility/single/PedestrianMobility.o $O/inet/mobility/single/PotentialForceMobility.o
 
 # Message files
 MSGFILES =

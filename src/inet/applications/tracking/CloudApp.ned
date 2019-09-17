@@ -68,22 +68,40 @@ simple CloudApp like IApp
         double kk = default(0.01);	// force cars-pedestrians coefficient
         double dk = default(-1); // force cars-pedestrian distance to epsilon
         
+        double wg = default(3);	// force UAV-crowd max val
+        double kg = default(0.01);	// force UAV-crowd coefficient
+        double dg = default(-1); // force UAV-crowd distance to epsilon
+        
         double coverageDistance @unit(m) = default(20 m); 
         
         double force_exponent = default(4);	// force exponent
         
         double deattraction_impact = default(1.0); // deattraction factor when a pedestrian is being covered
         
-        double uavMaxEnergyJ = default(130000); // maximum and initial UAV energy
+        double uavMaxEnergyJ = default(130000); // maximum UAV energy
+        double uavInitEnergyJ = default(uavMaxEnergyJ); // initial UAV energy
         double chargingW = default(15); // charging power
         double dischargingW = default(85); //  discharging power
         
         double rechargeTimeOffset @unit(s) = default(30 s);
         
+        double statisticOffset @unit(s) = default(10 s);
+        
         double areaMinX @unit(m) = default(0 m); // min x position of the constraint area
         double areaMinY @unit(m) = default(0 m); // min y position of the constraint area
         double areaMaxX @unit(m) = default(0 m); // max x position of the constraint area
         double areaMaxY @unit(m) = default(0 m); // max y position of the constraint area
+        
+        bool keepFullMap = default(false);
+        double forceMapOffset @unit(m) = default(10 m);
+        double forceDrawCoefficient = default(1);
+        string fileData = default("forces_%s.dat");
+        
+        string chargingType @enum("mobileCar","fixedStation","noCharger") = default("mobileCar");
+        string chargingScheduling @enum("stimrespSched","greedySched") = default("stimrespSched");
+        
+        string crowdFollow @enum("noCrowd","knownCrowd","clusterCrowd") = default("noCrowd");
+        int numClusterCrowd = default(1);
         
         @display("i=block/app");
         @lifecycleSupport;        
