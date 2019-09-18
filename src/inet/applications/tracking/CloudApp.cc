@@ -540,8 +540,14 @@ void CloudApp::rechargeSchedule() {
 
                 if (cScheduling == STIMULUS_SCHEDULING) {   // Stimulus-Reply probability
                     double stimulus = (puav->getActualEnergy() - minEnergy) / (maxEnergy - minEnergy);
-                    double threshold = (maxEnergy - puav->getActualEnergy()) / (maxEnergy - minEnergy);
-                    prob = pow(stimulus, 2.0) / (pow(stimulus, 2.0) + pow(threshold, 2.0));
+                    if (stimulus == 0) {
+                        prob = puav->getActualEnergy() / puav->getMaxEnergy();
+                    }
+                    else {
+                        //double threshold = (maxEnergy - puav->getActualEnergy()) / (maxEnergy - minEnergy);
+                        double threshold = 1.0 - (puav->getActualEnergy() / puav->getMaxEnergy());
+                        prob = pow(stimulus, 2.0) / (pow(stimulus, 2.0) + pow(threshold, 2.0));
+                    }
                 } else if (cScheduling == GREEDY_SCHEDULING) {   // Greedy probability
                     prob = puav->getActualEnergy() / puav->getMaxEnergy();
                 }
@@ -621,7 +627,8 @@ void CloudApp::rechargeSchedule() {
 
                 if (cScheduling == STIMULUS_SCHEDULING) {   // Stimulus-Reply probability
                     double stimulus = (maxEnergy - puav->getActualEnergy()) / (maxEnergy - minEnergy);
-                    double threshold = coveredPed / nCoveredPed;
+                    //double threshold = coveredPed / nCoveredPed;
+                    double threshold = algebraicsum(coveredPed / nCoveredPed, (puav->getActualEnergy() - minEnergy) / (maxEnergy - minEnergy)) ;
                     prob = pow(stimulus, 2.0) / (pow(stimulus, 2.0) + pow(threshold, 2.0));
                 }
                 else if (cScheduling == GREEDY_SCHEDULING) {   // Greedy probability
