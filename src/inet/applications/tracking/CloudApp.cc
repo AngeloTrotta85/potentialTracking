@@ -46,6 +46,9 @@ void CloudApp::initialize(int stage) {
         wp = par("wp");
         kp = par("kp");
         dp = par("dp");
+        wp2 = par("wp2");
+        kp2 = par("kp2");
+        dp2 = par("dp2");
 
         wu = par("wu");
         ku = par("ku");
@@ -202,9 +205,9 @@ void CloudApp::initialize(int stage) {
         if (keepFullMap) {
             uavForcesMatrix.resize(numUAV);
             for (auto& u : uavForcesMatrix) {
-                u.resize(floor(((double) areaMaxX) / forceMapOffset));
+                u.resize(floor(((double) areaMaxX) / forceMapOffset) + 1);
                 for (auto& r : u) {
-                    r.resize(floor(((double) areaMaxY) / forceMapOffset), Coord::ZERO);
+                    r.resize(floor(((double) areaMaxY) / forceMapOffset) + 1, Coord::ZERO);
                 }
             }
             //uavForcesMatrix.resize(floor(areaMaxX / forceMapOffset));
@@ -218,9 +221,9 @@ void CloudApp::initialize(int stage) {
             //}
             carForcesMatrix.resize(numCar);
             for (auto& c : carForcesMatrix) {
-                c.resize(floor(((double) areaMaxX) / forceMapOffset));
+                c.resize(floor(((double) areaMaxX) / forceMapOffset) + 1);
                 for (auto& r : c) {
-                    r.resize(floor(((double) areaMaxY) / forceMapOffset), Coord::ZERO);
+                    r.resize(floor(((double) areaMaxY) / forceMapOffset) + 1, Coord::ZERO);
                 }
             }
         }
@@ -310,6 +313,102 @@ void CloudApp::finish() {
                 ofs.close();
             }
         }
+
+        snprintf(bufftxt, sizeof(bufftxt), "GRID");
+        snprintf(buffname, sizeof(buffname), fileData.c_str(), bufftxt);
+        std::ofstream ofsgrid (buffname, std::ofstream::out);
+        if (ofsgrid.is_open()) {
+            ofsgrid << "G" << 1 << "\t" << areaMinX << "\t" << areaMinY << endl;
+            ofsgrid << "G" << 2 << "\t" << areaMinX << "\t" << areaMaxY << endl;
+            ofsgrid << "G" << 3 << "\t" << areaMaxX << "\t" << areaMinY << endl;
+            ofsgrid << "G" << 4 << "\t" << areaMaxX << "\t" << areaMaxY << endl;
+            ofsgrid.close();
+        }
+
+        snprintf(bufftxt, sizeof(bufftxt), "UAV");
+        snprintf(buffname, sizeof(buffname), fileData.c_str(), bufftxt);
+        std::ofstream ofsuav (buffname, std::ofstream::out);
+        if (ofsuav.is_open()) {
+            for(unsigned int u = 0; u < uavMobilityModules.size(); u++) {
+                Coord uPos = uavMobilityModules[u]->getCurrentPosition();
+                ofsuav << "U" << u << "\t" << uPos.x << "\t" << uPos.y << endl;
+            }
+            ofsuav.close();
+        }
+
+        snprintf(bufftxt, sizeof(bufftxt), "CAR");
+        snprintf(buffname, sizeof(buffname), fileData.c_str(), bufftxt);
+        std::ofstream ofscar (buffname, std::ofstream::out);
+        if (ofscar.is_open()) {
+            for(unsigned int c = 0; c < carMobilityModules.size(); c++) {
+                Coord cPos = carMobilityModules[c]->getCurrentPosition();
+                ofscar << "C" << c << "\t" << cPos.x << "\t" << cPos.y << endl;
+            }
+            ofscar.close();
+        }
+
+        snprintf(bufftxt, sizeof(bufftxt), "PED");
+        snprintf(buffname, sizeof(buffname), fileData.c_str(), bufftxt);
+        std::ofstream ofsped (buffname, std::ofstream::out);
+        if (ofsped.is_open()) {
+            for(unsigned int p = 0; p < pedonsMobilityModules.size(); p++) {
+                if (pedonsKnowledge[p]) {
+                    Coord pPos = pedonsMobilityModules[p]->getCurrentPosition();
+                    ofsped << "P" << p << "\t" << pPos.x << "\t" << pPos.y << endl;
+                }
+            }
+            ofsped.close();
+        }
+
+        snprintf(bufftxt, sizeof(bufftxt), "PEDNO");
+        snprintf(buffname, sizeof(buffname), fileData.c_str(), bufftxt);
+        std::ofstream ofspedno (buffname, std::ofstream::out);
+        if (ofspedno.is_open()) {
+            for(unsigned int p = 0; p < pedonsMobilityModules.size(); p++) {
+                if (!pedonsKnowledge[p]) {
+                    Coord pPos = pedonsMobilityModules[p]->getCurrentPosition();
+                    ofspedno << "P" << p << "\t" << pPos.x << "\t" << pPos.y << endl;
+                }
+            }
+            ofspedno.close();
+        }
+
+        for (unsigned int u = 0; u < uavMobilityModules.size(); u++) {
+            Coord uPos = uavMobilityModules[u]->getCurrentPosition();
+            snprintf(bufftxt, sizeof(bufftxt), "u%d_UAV", u);
+            snprintf(buffname, sizeof(buffname), fileData.c_str(), bufftxt);
+            std::ofstream ofsuav_u (buffname, std::ofstream::out);
+            if (ofsuav_u.is_open()) {
+                ofsuav_u << "U" << u << "\t" << uPos.x << "\t" << uPos.y << endl;
+                ofsuav_u.close();
+            }
+
+            snprintf(bufftxt, sizeof(bufftxt), "u%d_PED", u);
+            snprintf(buffname, sizeof(buffname), fileData.c_str(), bufftxt);
+            std::ofstream ofsped_u (buffname, std::ofstream::out);
+            if (ofsped_u.is_open()) {
+                for(unsigned int p = 0; p < pedonsMobilityModules.size(); p++) {
+                    if (pedonsMobilityModules[p]->getCurrentPosition().distance(uPos) <= coverageDistance) {
+                        Coord pPos = pedonsMobilityModules[p]->getCurrentPosition();
+                        ofsped_u << "P" << p << "\t" << pPos.x << "\t" << pPos.y << endl;
+                    }
+                }
+                ofsped_u.close();
+            }
+
+            snprintf(bufftxt, sizeof(bufftxt), "u%d_PEDNO", u);
+            snprintf(buffname, sizeof(buffname), fileData.c_str(), bufftxt);
+            std::ofstream ofspedno_u (buffname, std::ofstream::out);
+            if (ofspedno_u.is_open()) {
+                for(unsigned int p = 0; p < pedonsMobilityModules.size(); p++) {
+                    if (pedonsMobilityModules[p]->getCurrentPosition().distance(uPos) > coverageDistance) {
+                        Coord pPos = pedonsMobilityModules[p]->getCurrentPosition();
+                        ofspedno_u << "P" << p << "\t" << pPos.x << "\t" << pPos.y << endl;
+                    }
+                }
+                ofspedno_u.close();
+            }
+        }
     }
 
     ApplicationBase::finish();
@@ -354,6 +453,7 @@ void CloudApp::handleMessageWhenUp(cMessage *msg) {
         else if (msg == selfMsg_run) {
             //std::cerr << "handleMessageWhenUp: recognized " << msg->getFullName() << endl << std::flush;
 
+
             updatePedestrianKnowledge();
 
             if (cType != NO_CHARGER) {
@@ -369,6 +469,11 @@ void CloudApp::handleMessageWhenUp(cMessage *msg) {
             //updatePedestrianForces();
 
             checkLifetime();
+
+
+            if (keepFullMap) {
+                endSimulation();
+            }
 
             //std::cerr << "handleMessageWhenUp: OK updated forces" << endl << std::flush;
 
@@ -723,7 +828,7 @@ Coord CloudApp::calculateUAVForce(int u, Coord pos) {
         for (unsigned int p = 0; p < pedonsMobilityModules.size(); p++) {
             if (pedonsKnowledge[p]) {
                 Coord actPedForce = calculateAttractiveForce(pos, pedonsMobilityModules[p]->getCurrentPosition(), wp, kp, dp, epsilon);
-                actPedForce += calculateAttractiveForce(pos, pedonsMobilityModules[p]->getCurrentPosition(), 0.5, kr, dr*2.0, epsilon);
+                actPedForce += calculateAttractiveForce(pos, pedonsMobilityModules[p]->getCurrentPosition(), wp2, kp2, dp2, epsilon);
 
                 double reducingFactor = calculateAttractiveForceReduction(pedonsMobilityModules[p]->getCurrentPosition(), u, deattraction_impact, kr, dr, epsilon);
 
@@ -841,7 +946,9 @@ Coord CloudApp::calculateMobileChargerForce(int c, Coord pos) {
 
         //add repulsive forces from the pedestrians
         for (unsigned int p = 0; p < pedonsMobilityModules.size(); p++) {
-            carForce += calculateRepulsiveForce(pos, pedonsMobilityModules[p]->getCurrentPosition(), wk, kk, dk, epsilon);
+            if (pedonsKnowledge[p]) {
+                carForce += calculateRepulsiveForce(pos, pedonsMobilityModules[p]->getCurrentPosition(), wk, kk, dk, epsilon);
+            }
         }
 
     }

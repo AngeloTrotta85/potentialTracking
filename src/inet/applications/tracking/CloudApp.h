@@ -76,6 +76,9 @@ public:
     double wp;
     double kp;
     double dp;
+    double wp2;
+    double kp2;
+    double dp2;
 
     double wu;
     double ku;

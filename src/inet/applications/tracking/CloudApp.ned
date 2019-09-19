@@ -51,6 +51,9 @@ simple CloudApp like IApp
         double wp = default(1);	// force uav-pedestrian max val
         double kp = default(0.001);	// force uav-pedestrian coefficient
         double dp = default(-1); // force uav-pedestrian distance to epsilon
+        double wp2 = default(1);	// force uav-pedestrian max val
+        double kp2 = default(0.001);	// force uav-pedestrian coefficient
+        double dp2 = default(-1); // force uav-pedestrian distance to epsilon
         
         double wu = default(2);	// force uav-UAVs max val
         double ku = default(0.01);	// force uav-UAVs coefficient
