@@ -116,7 +116,7 @@ void PotentialForceMobility::updateEnergy(double elapsedTime)
     //std::cerr << " - buddy: " << buddy << endl << std::flush;
     if (    (chargingUAV) &&
             (buddy != nullptr) &&
-            (buddy->myPosition.distance(lastPosition) <= 2)
+            (buddy->myPosition.distance(lastPosition) <= 10)
             ){
     //if (chargingUAV) {
         actualEnergy += elapsedTime * rechargeWatt;
