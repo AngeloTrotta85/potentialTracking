@@ -55,6 +55,11 @@ public:
         CROWD_CLUSTER
     } crowdFollow_t;
 
+    typedef enum uavMobility_t {
+        FORCE_MOBILITY,
+        GRID_MOBILITY
+    } uavMobility_t;
+
   protected:
     enum SelfMsgKinds { START = 1, SEND, STOP };
 
@@ -113,14 +118,10 @@ public:
 
     double statisticOffset;
 
-    std::string chargingType;
     chargingType_t cType;
-
-    std::string chargingScheduling;
     chargingScheduling_t cScheduling;
-
-    std::string crowdFollow;
     crowdFollow_t crowd;
+    uavMobility_t uavMobility;
 
     int numClusterCrowd;
 
@@ -141,6 +142,8 @@ public:
     //std::vector< std::pair<Coord, double> >coveragePointsVect;
     //std::vector< Coord >coveragePointsVect;
     std::vector< std::pair <Coord, simtime_t> > lastRandom;
+
+    std::vector<Coord> staticGrid;
 
 
     std::vector< std::vector< double > > pedIsCovered;

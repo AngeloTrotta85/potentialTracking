@@ -101,6 +101,7 @@ simple CloudApp like IApp
         string chargingScheduling @enum("stimrespSched","greedySched") = default("stimrespSched");
         
         string crowdFollow @enum("noCrowd","knownCrowd","clusterCrowd") = default("noCrowd");
+        string uavMobility @enum("forces","grid") = default("forces");
         int numClusterCrowd = default(1);
         
         @display("i=block/app");

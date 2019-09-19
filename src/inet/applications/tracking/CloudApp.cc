@@ -89,7 +89,7 @@ void CloudApp::initialize(int stage) {
         forceUpdateTime = par("forceUpdateTime");
         statisticOffset = par("statisticOffset");
 
-        chargingType = std::string(par("chargingType").stringValue());
+        std::string chargingType = std::string(par("chargingType").stringValue());
         if (chargingType.compare("mobileCar") == 0) {
             cType = MOBILE_CAR;
         } else if (chargingType.compare("fixedStation") == 0) {
@@ -100,7 +100,7 @@ void CloudApp::initialize(int stage) {
             throw cRuntimeError("Invalid chargingType parameter");
         }
 
-        chargingScheduling = std::string(par("chargingScheduling").stringValue());
+        std::string chargingScheduling = std::string(par("chargingScheduling").stringValue());
         if (chargingScheduling.compare("stimrespSched") == 0) {
             cScheduling = STIMULUS_SCHEDULING;
         } else if (chargingScheduling.compare("greedySched") == 0) {
@@ -110,7 +110,7 @@ void CloudApp::initialize(int stage) {
         }
 
         numClusterCrowd = par("numClusterCrowd");
-        crowdFollow = std::string(par("crowdFollow").stringValue());
+        std::string crowdFollow = std::string(par("crowdFollow").stringValue());
         if (crowdFollow.compare("noCrowd") == 0) {
             crowd = CROWD_NO;
         } else if (crowdFollow.compare("knownCrowd") == 0) {
@@ -119,6 +119,15 @@ void CloudApp::initialize(int stage) {
             crowd = CROWD_CLUSTER;
         } else {
             throw cRuntimeError("Invalid crowdFollow parameter");
+        }
+
+        std::string uavMobilityString = std::string(par("uavMobility").stringValue());
+        if (uavMobilityString.compare("forces") == 0) {
+            uavMobility = FORCE_MOBILITY;
+        } else if (uavMobilityString.compare("grid") == 0) {
+            uavMobility = GRID_MOBILITY;
+        } else {
+            throw cRuntimeError("Invalid uavMobility parameter");
         }
 
 
@@ -174,6 +183,20 @@ void CloudApp::initialize(int stage) {
         pedIsCovered.resize(numPedestrian);
         pedCoverage.resize(numPedestrian);
 
+        staticGrid.resize(numUAV, Coord::ZERO);
+        int columns = int(ceil(sqrt(((double) numUAV) * (areaMaxX - areaMinX - 2.0 * dr) / (areaMaxY - areaMinY - 2.0 * dr))));
+        int rows = int(( ((double) numUAV) + ((double) columns) - 1.0) / ((double) columns));
+
+        double separationX = (areaMaxX - areaMinX - 2.0 * dr) / ((double) columns);
+        double separationY = (areaMaxY - areaMinY - 2.0 * dr) / ((double) rows);
+
+        for (int u = 0; u < numUAV; u++) {
+            int row = u / columns;
+            int col = u % columns;
+            double x = areaMinX + dr + (col + 0.5) * separationX;
+            double y = areaMinY + dr + (row + 0.5) * separationY;
+            staticGrid[u] = Coord(x, y);
+        }
 
         //generate the 2 forces maps
         if (keepFullMap) {
@@ -700,7 +723,7 @@ Coord CloudApp::calculateUAVForce(int u, Coord pos) {
         for (unsigned int p = 0; p < pedonsMobilityModules.size(); p++) {
             if (pedonsKnowledge[p]) {
                 Coord actPedForce = calculateAttractiveForce(pos, pedonsMobilityModules[p]->getCurrentPosition(), wp, kp, dp, epsilon);
-                actPedForce += calculateAttractiveForce(pos, pedonsMobilityModules[p]->getCurrentPosition(), 0.5, kr, dr, epsilon);
+                actPedForce += calculateAttractiveForce(pos, pedonsMobilityModules[p]->getCurrentPosition(), 0.5, kr, dr*2.0, epsilon);
 
                 double reducingFactor = calculateAttractiveForceReduction(pedonsMobilityModules[p]->getCurrentPosition(), u, deattraction_impact, kr, dr, epsilon);
 
@@ -792,8 +815,12 @@ void CloudApp::updateUAVForces() {
     bool coverageMapUpdated = false;
 
     for (unsigned int u = 0; u < uavMobilityModules.size(); u++) {
-
-        uavMobilityModules[u]->setActiveForce(calculateUAVForce(u, uavMobilityModules[u]->getCurrentPosition()));
+        if (uavMobility == FORCE_MOBILITY) {
+            uavMobilityModules[u]->setActiveForce(calculateUAVForce(u, uavMobilityModules[u]->getCurrentPosition()));
+        }
+        else if (uavMobility == GRID_MOBILITY) {
+            uavMobilityModules[u]->setActiveForce(staticGrid[u] - uavMobilityModules[u]->getCurrentPosition());
+        }
     }
 }
 
