@@ -146,6 +146,12 @@ public:
     std::vector< std::vector< double > > pedIsCovered;
     std::vector< std::vector< double > > pedCoverage;
 
+    //stats
+    double actMean_probRecharge;
+    double nMean_probRecharge;
+    double actMean_probFly;
+    double nMean_probFly;
+
 
   protected:
     virtual int numInitStages() const override { return NUM_INIT_STAGES; }

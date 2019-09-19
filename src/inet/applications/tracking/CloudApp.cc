@@ -129,6 +129,13 @@ void CloudApp::initialize(int stage) {
 
         selfMsg_stat = new cMessage("statTimer");
         scheduleAt(simTime() + statisticOffset, selfMsg_stat);
+
+        actMean_probRecharge = 0;
+        nMean_probRecharge = 0;
+        actMean_probFly = 0;
+        nMean_probFly = 0;
+
+        WATCH(actMean_probRecharge);
     }
     else if (stage == INITSTAGE_LAST) {
         int numUAV = this->getParentModule()->getParentModule()->getSubmodule("uav", 0)->getVectorSize();
@@ -221,6 +228,9 @@ void CloudApp::finish() {
         recordScalar("pedestrianNumCoverage", sumCoverage / countCoverage);
         recordScalar("pedestrianIsCovered", sumCovered / countCovered);
     }
+
+    recordScalar("recharge probability", actMean_probRecharge);
+    recordScalar("fly probability", actMean_probFly);
 
     if (keepFullMap) {
         updatePedestrianKnowledge();
@@ -539,11 +549,12 @@ void CloudApp::rechargeSchedule() {
                 //double prob = 1.0 - pow((1.0 - energyRatio), 1.0 / (worseUAV + 1.0) );      // vers.2
 
                 if (cScheduling == STIMULUS_SCHEDULING) {   // Stimulus-Reply probability
-                    double stimulus = (puav->getActualEnergy() - minEnergy) / (maxEnergy - minEnergy);
-                    if (stimulus == 0) {
+
+                    if (maxEnergy == minEnergy) {
                         prob = puav->getActualEnergy() / puav->getMaxEnergy();
                     }
                     else {
+                        double stimulus = (puav->getActualEnergy() - minEnergy) / (maxEnergy - minEnergy);
                         //double threshold = (maxEnergy - puav->getActualEnergy()) / (maxEnergy - minEnergy);
                         double threshold = 1.0 - (puav->getActualEnergy() / puav->getMaxEnergy());
                         prob = pow(stimulus, 2.0) / (pow(stimulus, 2.0) + pow(threshold, 2.0));
@@ -551,6 +562,14 @@ void CloudApp::rechargeSchedule() {
                 } else if (cScheduling == GREEDY_SCHEDULING) {   // Greedy probability
                     prob = puav->getActualEnergy() / puav->getMaxEnergy();
                 }
+
+                if (nMean_probFly == 0) {
+                    actMean_probFly = prob;
+                }
+                else {
+                    actMean_probFly = actMean_probFly + ((prob - actMean_probFly) / (nMean_probFly + 1.0));
+                }
+                ++nMean_probFly;
 
                 if (dblrand() < prob) {
                     PotentialForceMobility *pcar = puav->getBuddy();
@@ -626,14 +645,33 @@ void CloudApp::rechargeSchedule() {
 
 
                 if (cScheduling == STIMULUS_SCHEDULING) {   // Stimulus-Reply probability
-                    double stimulus = (maxEnergy - puav->getActualEnergy()) / (maxEnergy - minEnergy);
+                    //double stimulus = (maxEnergy - puav->getActualEnergy()) / (maxEnergy - minEnergy);
+                    double stimulus = 1.0 - energyRatio;
                     //double threshold = coveredPed / nCoveredPed;
-                    double threshold = algebraicsum(coveredPed / nCoveredPed, (puav->getActualEnergy() - minEnergy) / (maxEnergy - minEnergy)) ;
-                    prob = pow(stimulus, 2.0) / (pow(stimulus, 2.0) + pow(threshold, 2.0));
+                    if ((nCoveredPed > 0) && ((maxEnergy > minEnergy))){
+                        double threshold = algebraicsum(coveredPed / nCoveredPed, (puav->getActualEnergy() - minEnergy) / (maxEnergy - minEnergy)) ;
+                        prob = pow(stimulus, 2.0) / (pow(stimulus, 2.0) + pow(threshold, 2.0));
+                    }
+                    else {
+                        prob = stimulus;
+                    }
+
+                    /*EV << "UAV " << pcar->getCurrentPosition() <<
+                            ". Stimulus = " << stimulus <<
+                            "; Threshold = " << threshold <<
+                            "; PROB = " << prob << endl;*/
                 }
                 else if (cScheduling == GREEDY_SCHEDULING) {   // Greedy probability
                     prob = 1.0 - energyRatio;
                 }
+
+                if (nMean_probRecharge == 0) {
+                    actMean_probRecharge = prob;
+                }
+                else {
+                    actMean_probRecharge = actMean_probRecharge + ((prob - actMean_probRecharge) / (nMean_probRecharge + 1.0));
+                }
+                ++nMean_probRecharge;
 
                 if (dblrand() < prob) {
 
@@ -662,6 +700,8 @@ Coord CloudApp::calculateUAVForce(int u, Coord pos) {
         for (unsigned int p = 0; p < pedonsMobilityModules.size(); p++) {
             if (pedonsKnowledge[p]) {
                 Coord actPedForce = calculateAttractiveForce(pos, pedonsMobilityModules[p]->getCurrentPosition(), wp, kp, dp, epsilon);
+                actPedForce += calculateAttractiveForce(pos, pedonsMobilityModules[p]->getCurrentPosition(), 0.5, kr, dr, epsilon);
+
                 double reducingFactor = calculateAttractiveForceReduction(pedonsMobilityModules[p]->getCurrentPosition(), u, deattraction_impact, kr, dr, epsilon);
 
                 uavForce += actPedForce * reducingFactor;
