@@ -186,19 +186,25 @@ void CloudApp::initialize(int stage) {
         pedIsCovered.resize(numPedestrian);
         pedCoverage.resize(numPedestrian);
 
+        double gridBorder = 100; //dr;
         staticGrid.resize(numUAV, Coord::ZERO);
-        int columns = int(ceil(sqrt(((double) numUAV) * (areaMaxX - areaMinX - 2.0 * dr) / (areaMaxY - areaMinY - 2.0 * dr))));
+        int columns = int(ceil(sqrt(((double) numUAV) * (areaMaxX - areaMinX - 2.0 * gridBorder) / (areaMaxY - areaMinY - 2.0 * gridBorder))));
         int rows = int(( ((double) numUAV) + ((double) columns) - 1.0) / ((double) columns));
 
-        double separationX = (areaMaxX - areaMinX - 2.0 * dr) / ((double) columns);
-        double separationY = (areaMaxY - areaMinY - 2.0 * dr) / ((double) rows);
+        double separationX = (areaMaxX - areaMinX - 2.0 * gridBorder) / ((double) (columns - 1));
+        double separationY = (areaMaxY - areaMinY - 2.0 * gridBorder) / ((double) (rows - 1));
 
         for (int u = 0; u < numUAV; u++) {
             int row = u / columns;
             int col = u % columns;
-            double x = areaMinX + dr + (col + 0.5) * separationX;
-            double y = areaMinY + dr + (row + 0.5) * separationY;
+            //double x = areaMinX + gridBorder + (col + 0.5) * separationX;
+            //double y = areaMinY + gridBorder + (row + 0.5) * separationY;
+            //double x = gridBorder + (((double) col) + 0.5) * separationX;
+            double x = gridBorder + ((double) col) * separationX;
+            double y = gridBorder + ((double) row) * separationY;
             staticGrid[u] = Coord(x, y);
+
+            //std::cerr << "UAV" << u << " at " << staticGrid[u] << endl;
         }
 
         //generate the 2 forces maps
@@ -250,9 +256,17 @@ void CloudApp::finish() {
         }
     }
 
-    if ((countCoverage > 0) && (countCovered > 0)) {
+    if (countCoverage > 0) {
         recordScalar("pedestrianNumCoverage", sumCoverage / countCoverage);
+    }
+    else {
+        recordScalar("pedestrianNumCoverage", 0);
+    }
+    if (countCovered > 0) {
         recordScalar("pedestrianIsCovered", sumCovered / countCovered);
+    }
+    else {
+        recordScalar("pedestrianIsCovered", 0);
     }
 
     recordScalar("recharge probability", actMean_probRecharge);
